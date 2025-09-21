@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #000000;
+    }
+    .container {
+      background-color: #110e16;
+      box-shadow: 0 0 15px 5px #2a0d4d, 0 0 30px 10px #2a0d4d, 0 0 45px 15px #2a0d4d;
+      border: 2px solid #1a0733;
+    }
+    .button {
+      background-color: #2a0d4d;
+      transition: background-color 0.3s, transform 0.2s;
+    }
+    .button:hover {
+      background-color: #3a1166;
+      transform: translateY(-2px);
+    }
+    .button:active {
+      background-color: #1b0730;
+    }
+    .text-area {
+      min-height: 200px;
+      background-color: #0d0a11;
+      border: 1px solid #1c1426;
+      word-wrap: break-word;
+    }
+    #status-message {
+      color: #9d6ec5;
+    }
+    .mic-icon-static {
+      filter: drop-shadow(0 0 8px #6a0dad);
+    }
+    .glowing-pulse {
+      animation: pulse 1.5s infinite ease-in-out;
+    }
+    @keyframes pulse {
+      0% {
+        filter: drop-shadow(0 0 5px #6a0dad);
+      }
+      50% {
+        filter: drop-shadow(0 0 15px #6a0dad);
+      }
+      100% {
+        filter: drop-shadow(0 0 5px #6a0dad);
+      }
+    }
+  </style>
+</head>
+<body class="bg-black text-white flex items-center justify-center min-h-screen p-4">
+
+  <div class="container w-full max-w-lg p-8 rounded-3xl text-center">
+    <h1 class="text-4xl font-bold mb-8 text-purple-400">Voice Assistant</h1>
+
+    <div id="mic-icon-container" class="mb-8 flex justify-center">
+      <!-- Simplified mic icon -->
+      <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" class="h-20 w-20 text-purple-500 mic-icon-static" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3z"/>
+        <path d="M19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V21H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-3.08A7 7 0 0 0 19 11z"/>
+      </svg>
+    </div>
+
+    <div id="output-area" class="text-area w-full p-4 rounded-xl mb-6 text-left text-purple-100">
+      <p><strong>Assistant:</strong> Hello! Click the 'Start Listening' button and say a command. You can ask me about the time, the date, or tell me to say something.</p>
+    </div>
+
+    <p id="status-message" class="text-sm italic mb-4">Click the button to begin.</p>
+    
+    <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+      <button id="start-btn" class="button flex-1 py-3 px-6 rounded-full font-semibold text-white">Start Listening</button>
+      <button id="stop-btn" class="button flex-1 py-3 px-6 rounded-full font-semibold text-white" disabled>Stop Listening</button>
+    </div>
+  </div>
+
+  <script>
+    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const speechRecognition = window.SpeechRecognition ? new window.SpeechRecognition() : null;
+    const speechSynthesis = window.speechSynthesis;
+
+    const outputArea = document.getElementById('output-area');
+    const startBtn = document.getElementById('start-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const statusMessage = document.getElementById('status-message');
+    const micIcon = document.getElementById('mic-icon');
+
+    let isListening = false;
+
+    if (!speechRecognition || !speechSynthesis) {
+      outputArea.innerHTML = '<p class="text-red-400"><strong>Error:</strong> Your browser does not support the Web Speech API. Please use a modern browser like Google Chrome or Microsoft Edge.</p>';
+      startBtn.disabled = true;
+      stopBtn.disabled = true;
+      statusMessage.style.display = 'none';
+    } else {
+      speechRecognition.interimResults = false;
+      speechRecognition.continuous = false;
+
+      speechRecognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript.trim().toLowerCase();
+        appendMessage(`You: ${transcript}`);
+        handleCommand(transcript);
+      };
+
+      speechRecognition.onerror = (event) => {
+        if (event.error === 'aborted') {
+          if (isListening) {
+            statusMessage.textContent = 'Listening...';
+            micIcon.classList.add('glowing-pulse');
+            speechRecognition.start();
+          }
+        } else {
+          isListening = false;
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+          micIcon.classList.remove('glowing-pulse');
+          console.error('Speech recognition error', event.error);
+          statusMessage.textContent = 'An error occurred. Try again.';
+        }
+      };
+
+      speechRecognition.onend = () => {
+        if (isListening) {
+          micIcon.classList.add('glowing-pulse');
+          statusMessage.textContent = 'Listening...';
+          speechRecognition.start();
+        } else {
+          statusMessage.textContent = 'Ready to start. Click the button.';
+          micIcon.classList.remove('glowing-pulse');
+        }
+      };
+
+      startBtn.onclick = () => {
+        isListening = true;
+        speechRecognition.start();
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        statusMessage.textContent = 'Listening... Speak now.';
+        micIcon.classList.add('glowing-pulse');
+      };
+
+      stopBtn.onclick = () => {
+        isListening = false;
+        speechRecognition.stop();
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        statusMessage.textContent = 'Listening stopped.';
+        micIcon.classList.remove('glowing-pulse');
+      };
+      
+      function handleCommand(command) {
+        let response = "I'm sorry, I don't understand that command.";
+
+        if (command.includes('hello') || command.includes('hi')) {
+          response = "Hello there! How can I help you?";
+        } else if (command.includes('time')) {
+          response = `The current time is ${new Date().toLocaleTimeString()}.`;
+        } else if (command.includes('date')) {
+          response = `Today's date is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`;
+        } else if (command.includes('joke')) {
+          response = "Why don't scientists trust atoms? Because they make up everything!";
+        } else if (command.includes('say')) {
+          const whatToSay = command.split('say ')[1];
+          if (whatToSay) {
+            response = whatToSay;
+          } else {
+            response = "What would you like me to say?";
+          }
+        }
+        
+        speakText(response);
+      }
+
+      function speakText(text) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        
+        const voices = speechSynthesis.getVoices();
+        const preferredVoice = voices.find(voice => voice.name.includes('Google US English'));
+        if (preferredVoice) {
+          utterance.voice = preferredVoice;
+        }
+        
+        utterance.onend = () => {
+          if (isListening) {
+            micIcon.classList.add('glowing-pulse');
+            statusMessage.textContent = 'Listening...';
+            speechRecognition.start();
+          }
+        };
+
+        appendMessage(`Assistant: ${text}`);
+        speechSynthesis.speak(utterance);
+      }
+
+      function appendMessage(message) {
+        const messageElement = document.createElement('p');
+        messageElement.textContent = message;
+        messageElement.classList.add('my-2', 'p-2', 'rounded-md');
+
+        if (message.startsWith('You:')) {
+          messageElement.classList.add('bg-purple-900', 'text-purple-100', 'text-right', 'ml-auto', 'max-w-[85%]');
+        } else {
+          messageElement.classList.add('bg-purple-800', 'text-purple-100', 'mr-auto', 'max-w-[85%]');
+        }
+        
+        outputArea.appendChild(messageElement);
+        outputArea.scrollTop = outputArea.scrollHeight;
+      }
+    }
+  </script>
+</body>
+</html>
